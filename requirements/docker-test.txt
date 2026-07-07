@@ -1,0 +1,2 @@
+# Reserved for smoke-test-only Python dependencies.
+# Keep this file minimal; current smoke helpers use only project/runtime deps.
