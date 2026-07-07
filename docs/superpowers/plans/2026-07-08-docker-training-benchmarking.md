@@ -17,7 +17,6 @@
 - Runtime working directory: `/workspace/project`.
 - Copied project source directory: `/opt/gaussian-splatting`.
 - Runtime mount directories: `/workspace/datasets`, `/workspace/runs`, `/workspace/artifacts`, and `/workspace/cache`.
-- Do not package or build SIBR viewers in the training Docker image.
 - Do not modify training math, rasterizer behavior, optimizer defaults, or dataset parsing.
 - Install CUDA submodules during image build as non-editable packages with `pip install --no-build-isolation`.
 - Do not pin or override torch packages supplied by the PyTorch base image.
@@ -484,8 +483,6 @@ services:
       - ${GS_RUNS_HOST:-./runs}:/workspace/runs
       - ${GS_ARTIFACTS_HOST:-./artifacts}:/workspace/artifacts
       - ${GS_CACHE_HOST:-./cache}:/workspace/cache
-    ports:
-      - "${GS_VIEWER_PORT:-6009}:6009"
     command: bash
 ```
 
@@ -587,7 +584,6 @@ Include these facts:
 - `full_eval.py` orchestrates the paper-style train, render, and metrics workflow.
 - `convert.py` prepares COLMAP datasets from input images when COLMAP and ImageMagick are available.
 - `submodules/diff-gaussian-rasterization`, `submodules/simple-knn`, and `submodules/fused-ssim` are CUDA extensions compiled during Docker image build.
-- SIBR viewers are intentionally outside the training image.
 ```
 
 - [ ] **Step 3: Fill `Dataset And Output Layout`**
@@ -863,7 +859,7 @@ Spec coverage:
 - Requirements files are covered by Task 1.
 - Runtime helper scripts are covered by Task 1.
 - Dockerfile, non-editable CUDA submodule installs, default CUDA 13.0 lane, and build args are covered by Task 2.
-- Docker Compose GPU service, mounts, build args, and port 6009 are covered by Task 2.
+- Docker Compose GPU service, mounts, and build args are covered by Task 2.
 - Project overview, workflows, readiness matrix, and known risks are covered by Task 3.
 - Build and smoke verification plus readiness updates are covered by Task 4.
 

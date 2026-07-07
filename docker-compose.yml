@@ -28,6 +28,4 @@ services:
       - ${GS_RUNS_HOST:-./runs}:/workspace/runs
       - ${GS_ARTIFACTS_HOST:-./artifacts}:/workspace/artifacts
       - ${GS_CACHE_HOST:-./cache}:/workspace/cache
-    ports:
-      - "${GS_VIEWER_PORT:-6009}:6009"
     command: bash

@@ -37,7 +37,6 @@ checks for PyTorch, CUDA, and extension readiness.
 
 ## Non-Goals
 
-- Do not package or build the SIBR viewers in the training Docker image.
 - Do not convert the project into a full Python package unless required for
   Docker correctness.
 - Do not modify training math, rasterizer behavior, optimizer defaults, or
@@ -158,7 +157,8 @@ Add `docker-compose.yml` for convenience. It should:
 - request all NVIDIA GPUs through Compose GPU support;
 - mount datasets, runs, artifacts, and cache from host-controlled paths;
 - keep the default command as `bash`;
-- expose port `6009` only for the optional network viewer path.
+- avoid exposing service ports by default because the documented training
+  commands run with the viewer disabled.
 
 The compose file should not hard-code host dataset locations. It should allow
 environment overrides such as:
@@ -177,7 +177,7 @@ The documentation should cover:
 3. Run runtime info.
 4. Run the no-dataset smoke test.
 5. Train a mounted COLMAP dataset with explicit `-s` and `-m`.
-6. Train with evaluation split and disabled network viewer.
+6. Train with evaluation split and `--disable_viewer`.
 7. Render a trained model.
 8. Compute metrics.
 9. Run full evaluation when the official benchmark datasets are mounted.

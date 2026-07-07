@@ -3,8 +3,8 @@
 This document describes the project structure and the Docker workflow for
 reproducible 3D Gaussian Splatting training, rendering, and benchmarking.
 
-The Docker lane is intentionally focused on the Python optimizer and CUDA
-extension stack. It does not build the SIBR viewers.
+The Docker lane is intentionally focused on the Python optimizer, renderer,
+metrics scripts, and CUDA extension stack.
 
 ## Project Overview
 
@@ -19,7 +19,6 @@ image quality metrics.
 - `full_eval.py` orchestrates the paper-style train, render, and metrics workflow.
 - `convert.py` prepares COLMAP datasets from input images when COLMAP and ImageMagick are available.
 - `submodules/diff-gaussian-rasterization`, `submodules/simple-knn`, and `submodules/fused-ssim` are CUDA extensions compiled during Docker image build.
-- SIBR viewers are intentionally outside the training image.
 
 The checked-in `env.yml` remains useful as historical project context, but the
 Docker image does not use Conda. The image inherits Python, torch, torchvision,
@@ -312,7 +311,6 @@ Useful host-side environment variables:
 | `GS_ARTIFACTS_HOST` | `./artifacts` | Host artifact mount |
 | `GS_CACHE_HOST` | `./cache` | Host cache mount |
 | `GS_SHM_SIZE` | `16gb` | Shared memory size for the service |
-| `GS_VIEWER_PORT` | `6009` | Optional network viewer port mapping |
 
 Start an interactive shell:
 
