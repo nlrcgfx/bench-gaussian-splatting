@@ -53,9 +53,13 @@ def check_fused_ssim() -> None:
 
 def check_rasterizer_imports() -> None:
     module = importlib.import_module("diff_gaussian_rasterization")
-    for attr_name in ("GaussianRasterizationSettings", "GaussianRasterizer", "SparseGaussianAdam"):
+    for attr_name in ("GaussianRasterizationSettings", "GaussianRasterizer"):
         getattr(module, attr_name)
     print("diff_gaussian_rasterization imports ok")
+    if hasattr(module, "SparseGaussianAdam"):
+        print("diff_gaussian_rasterization SparseGaussianAdam optional import ok")
+    else:
+        print("diff_gaussian_rasterization SparseGaussianAdam optional import unavailable")
 
 
 def main() -> int:

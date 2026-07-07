@@ -44,6 +44,13 @@ packages with `pip install --no-build-isolation`. This makes the image a
 reproducible training artifact: the extension binaries are built once during
 image construction rather than at container startup.
 
+The Dockerfile applies one build-time compatibility patch after copying the
+source into the image: it inserts `#include <cstdint>` into the copied
+`diff-gaussian-rasterization` rasterizer header when the include is absent.
+This is required by the PyTorch 2.12 / CUDA 13 compiler stack because the
+extension uses fixed-width integer types that are not pulled in transitively.
+The checked-out submodule source is not modified by this patch.
+
 ## Dataset And Output Layout
 
 The container uses stable paths so host automation can mount datasets, collect
@@ -159,7 +166,8 @@ Passing `pytorch-cuda-smoke-test` moves a lane from `build-verified` to
 
 - torch can see CUDA;
 - a tiny CUDA tensor computation works;
-- `diff_gaussian_rasterization` imports `GaussianRasterizer` and `SparseGaussianAdam`;
+- `diff_gaussian_rasterization` imports the required rasterizer classes;
+- optional `SparseGaussianAdam` availability is reported but does not fail the default smoke test;
 - `simple_knn._C.distCUDA2` runs on a small point tensor;
 - `fused_ssim.fused_ssim` runs forward and backward on small image tensors.
 
@@ -177,7 +185,11 @@ Train with an evaluation split:
 docker compose run --rm gaussian-splatting python /opt/gaussian-splatting/train.py -s /workspace/datasets/garden -m /workspace/runs/garden-eval --eval --disable_viewer
 ```
 
-Train with sparse Adam when the accelerated rasterizer is available:
+Train with sparse Adam only when `pytorch-cuda-runtime-info` reports
+`import_diff_gaussian_rasterization.SparseGaussianAdam: ok (optional)`.
+The verified default CUDA 13.0 lane for this checkout currently reports that
+optional import as unavailable, so default Adam is the reproducible path unless
+the rasterizer submodule is replaced with one that exports `SparseGaussianAdam`.
 
 ```powershell
 docker compose run --rm gaussian-splatting python /opt/gaussian-splatting/train.py -s /workspace/datasets/garden -m /workspace/runs/garden-fast --eval --optimizer_type sparse_adam --disable_viewer
@@ -243,6 +255,8 @@ docker compose run --rm gaussian-splatting python /opt/gaussian-splatting/full_e
 Read the readiness notes below before relying on `full_eval.py` for automated
 CI-style benchmarking. The script is faithful to upstream behavior, but it is
 less robust than invoking `train.py`, `render.py`, and `metrics.py` directly.
+Its `--fast` option requests `--optimizer_type sparse_adam`, so use it only on
+images where the optional sparse Adam import is available.
 
 ## Compose Reference
 
@@ -284,16 +298,43 @@ The readiness states are:
 
 | Lane | Current State | Verification Required |
 | --- | --- | --- |
-| PyTorch 2.12.1 + CUDA 13.0 + Python 3.12 | documented | Build image, run runtime info, run smoke test |
+| PyTorch 2.12.1 + CUDA 13.0 + Python 3.12 | runtime-verified | Re-run on target hardware and benchmark datasets before publishing results |
 | PyTorch 2.12.1 + CUDA 12.6 + Python 3.12 | documented | Build image, run runtime info, run smoke test |
 | PyTorch 2.12.1 + CUDA 13.2 + Python 3.12 | documented | Build image, run runtime info, run smoke test |
 
 ## Known Risks And Readiness Notes
 
-- CUDA 13.x extension compilation is not claimed verified until the Docker build succeeds.
+- CUDA 13.0 is build-verified and runtime-verified in this workspace. CUDA 12.6 and CUDA 13.2 tags exist but still need full build and smoke verification.
+- Sparse Adam is optional. The verified CUDA 13.0 image for this checkout reports `SparseGaussianAdam` as unavailable, so `--optimizer_type sparse_adam` and `full_eval.py --fast` are not part of the verified workflow.
+- The Dockerfile's copied-source `<cstdint>` patch is required for CUDA 13.0 extension compilation with this rasterizer checkout.
 - `full_eval.py` uses string-based `os.system` calls and is less robust than direct command invocation.
 - `full_eval.py` can write `timing.txt` from uninitialized timing variables in some skip-only modes.
 - Full GPU determinism is not guaranteed by the existing optimizer.
 - Offline metrics runs require a populated `/workspace/cache`.
 - The CUDA extension ABI must be proven per PyTorch image lane by building the image.
 - Host drivers must support the selected CUDA runtime. CUDA 13.2 requires a sufficiently new NVIDIA driver.
+
+## Verification Notes
+
+The default image lane was verified with:
+
+```powershell
+docker compose build
+docker compose run --rm gaussian-splatting pytorch-cuda-runtime-info
+docker compose run --rm gaussian-splatting pytorch-cuda-smoke-test
+```
+
+Observed runtime:
+
+```text
+python: 3.12.3
+torch: 2.12.1+cu130
+torch_cuda: 13.0
+cuda_available: True
+cuda_device_0: NVIDIA GeForce RTX 4070 SUPER, capability=8.9
+import_diff_gaussian_rasterization.GaussianRasterizer: ok (required)
+import_diff_gaussian_rasterization.SparseGaussianAdam: fail (optional)
+import_simple_knn._C.distCUDA2: ok (required)
+import_fused_ssim.fused_ssim: ok (required)
+smoke test passed
+```

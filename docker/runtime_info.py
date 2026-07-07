@@ -15,9 +15,10 @@ class ImportCheck:
     name: str
     ok: bool
     detail: str
+    required: bool = True
 
 
-def check_import(module_name: str, attr_name: str | None = None) -> ImportCheck:
+def check_import(module_name: str, attr_name: str | None = None, *, required: bool = True) -> ImportCheck:
     try:
         module = importlib.import_module(module_name)
         if attr_name is not None:
@@ -26,9 +27,9 @@ def check_import(module_name: str, attr_name: str | None = None) -> ImportCheck:
         version = getattr(module, "__version__", None)
         if version:
             detail = f"ok version={version}"
-        return ImportCheck(module_name if attr_name is None else f"{module_name}.{attr_name}", True, detail)
+        return ImportCheck(module_name if attr_name is None else f"{module_name}.{attr_name}", True, detail, required)
     except Exception as exc:
-        return ImportCheck(module_name if attr_name is None else f"{module_name}.{attr_name}", False, f"{type(exc).__name__}: {exc}")
+        return ImportCheck(module_name if attr_name is None else f"{module_name}.{attr_name}", False, f"{type(exc).__name__}: {exc}", required)
 
 
 def print_kv(key: str, value: object) -> None:
@@ -54,15 +55,16 @@ def main() -> int:
 
     checks = (
         check_import("diff_gaussian_rasterization", "GaussianRasterizer"),
-        check_import("diff_gaussian_rasterization", "SparseGaussianAdam"),
+        check_import("diff_gaussian_rasterization", "SparseGaussianAdam", required=False),
         check_import("simple_knn._C", "distCUDA2"),
         check_import("fused_ssim", "fused_ssim"),
     )
     failed = False
     for check in checks:
         status = "ok" if check.ok else "fail"
-        print_kv(f"import_{check.name}", f"{status}: {check.detail}")
-        failed = failed or not check.ok
+        requirement = "required" if check.required else "optional"
+        print_kv(f"import_{check.name}", f"{status} ({requirement}): {check.detail}")
+        failed = failed or (check.required and not check.ok)
 
     return 1 if failed else 0
 
