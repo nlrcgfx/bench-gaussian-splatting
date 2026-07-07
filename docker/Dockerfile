@@ -65,7 +65,9 @@ COPY . /opt/gaussian-splatting
 
 WORKDIR /opt/gaussian-splatting
 
-RUN python -c "from pathlib import Path; p=Path('submodules/diff-gaussian-rasterization/cuda_rasterizer/rasterizer_impl.h'); text=p.read_text(); marker='#include <vector>\n'; include='#include <cstdint>\n'; assert include in text or marker in text; p.write_text(text if include in text else text.replace(marker, marker + include, 1))"
+RUN git apply --ignore-space-change \
+        --directory=submodules/diff-gaussian-rasterization \
+        docker/patches/diff-gaussian-rasterization-cstdint.patch
 
 RUN python -m pip install --no-cache-dir --no-build-isolation ./submodules/diff-gaussian-rasterization \
     && python -m pip install --no-cache-dir --no-build-isolation ./submodules/simple-knn \

@@ -44,12 +44,16 @@ packages with `pip install --no-build-isolation`. This makes the image a
 reproducible training artifact: the extension binaries are built once during
 image construction rather than at container startup.
 
-The Dockerfile applies one build-time compatibility patch after copying the
-source into the image: it inserts `#include <cstdint>` into the copied
-`diff-gaussian-rasterization` rasterizer header when the include is absent.
-This is required by the PyTorch 2.12 / CUDA 13 compiler stack because the
-extension uses fixed-width integer types that are not pulled in transitively.
-The checked-out submodule source is not modified by this patch.
+The Dockerfile lives at `docker/Dockerfile` and applies one checked-in
+compatibility patch after copying the source into the image:
+`docker/patches/diff-gaussian-rasterization-cstdint.patch`. The patch inserts
+`#include <cstdint>` into the copied `diff-gaussian-rasterization` rasterizer
+header. This is required by the PyTorch 2.12 / CUDA 13 compiler stack because
+the extension uses fixed-width integer types that are not pulled in
+transitively. The patch is applied with `git apply --ignore-space-change`, so
+the CRLF line endings used by the current submodule checkout are tolerated, but
+image builds still fail if the patch no longer applies cleanly. The checked-out
+submodule source is not modified by this Docker build step.
 
 ## Dataset And Output Layout
 
@@ -137,7 +141,7 @@ docker compose build
 Build without Compose:
 
 ```powershell
-docker build --build-arg PYTORCH_IMAGE=pytorch/pytorch:2.12.1-cuda13.0-cudnn9-devel -t gaussian-splatting:pytorch-2.12.1-cuda13.0 .
+docker build -f docker/Dockerfile --build-arg PYTORCH_IMAGE=pytorch/pytorch:2.12.1-cuda13.0-cudnn9-devel -t gaussian-splatting:pytorch-2.12.1-cuda13.0 .
 ```
 
 Tune parallel extension compilation with `MAX_JOBS`:
@@ -306,7 +310,7 @@ The readiness states are:
 
 - CUDA 13.0 is build-verified and runtime-verified in this workspace. CUDA 12.6 and CUDA 13.2 tags exist but still need full build and smoke verification.
 - Sparse Adam is optional. The verified CUDA 13.0 image for this checkout reports `SparseGaussianAdam` as unavailable, so `--optimizer_type sparse_adam` and `full_eval.py --fast` are not part of the verified workflow.
-- The Dockerfile's copied-source `<cstdint>` patch is required for CUDA 13.0 extension compilation with this rasterizer checkout.
+- The checked-in rasterizer `<cstdint>` patch is required for CUDA 13.0 extension compilation with this rasterizer checkout.
 - `full_eval.py` uses string-based `os.system` calls and is less robust than direct command invocation.
 - `full_eval.py` can write `timing.txt` from uninitialized timing variables in some skip-only modes.
 - Full GPU determinism is not guaranteed by the existing optimizer.

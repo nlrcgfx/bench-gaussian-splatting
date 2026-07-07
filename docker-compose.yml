@@ -2,7 +2,7 @@ services:
   gaussian-splatting:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: docker/Dockerfile
       args:
         PYTORCH_IMAGE: ${PYTORCH_IMAGE:-pytorch/pytorch:2.12.1-cuda13.0-cudnn9-devel}
         TORCH_CUDA_ARCH_LIST: ${TORCH_CUDA_ARCH_LIST:-8.6;8.9;12.0}
