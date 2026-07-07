@@ -93,18 +93,23 @@ in the upstream README.
 
 ## Docker Image Lanes
 
-The default lane is:
+Docker Buildx Bake defines the reproducible build matrix in `docker-bake.hcl`.
+The default and currently verified lane is:
 
 ```text
-pytorch/pytorch:2.12.1-cuda13.0-cudnn9-devel
+cu130 -> pytorch/pytorch:2.12.1-cuda13.0-cudnn9-devel
 ```
 
-The same Dockerfile can also be built with:
+Additional lanes are:
 
 ```text
-pytorch/pytorch:2.12.1-cuda12.6-cudnn9-devel
-pytorch/pytorch:2.12.1-cuda13.2-cudnn9-devel
+cu126 -> pytorch/pytorch:2.12.1-cuda12.6-cudnn9-devel
+cu132 -> pytorch/pytorch:2.12.1-cuda13.2-cudnn9-devel
 ```
+
+Bake tags the lane images as `gaussian-splatting:pytorch-2.12.1-cu126`,
+`gaussian-splatting:pytorch-2.12.1-cu130`, and
+`gaussian-splatting:pytorch-2.12.1-cu132`.
 
 The default CUDA architecture list is:
 
@@ -118,38 +123,62 @@ architecture set.
 
 ## Build Commands
 
-Build the default CUDA 13.0 lane through Compose:
+Builds should use Docker Buildx Bake. Compose remains the preferred runtime
+interface for mounted datasets, logs, artifacts, shared memory, and GPUs.
+
+Inspect the resolved Bake graph without building:
 
 ```powershell
-docker compose build
+docker buildx bake --print
 ```
 
-Build the CUDA 12.6 lane:
+Build and load the verified CUDA 13.0 lane locally:
 
 ```powershell
-$env:PYTORCH_IMAGE = 'pytorch/pytorch:2.12.1-cuda12.6-cudnn9-devel'
-docker compose build
+docker buildx bake cu130 --load
 ```
 
-Build the CUDA 13.2 lane:
+Build and load the CUDA 12.6 lane locally:
 
 ```powershell
-$env:PYTORCH_IMAGE = 'pytorch/pytorch:2.12.1-cuda13.2-cudnn9-devel'
-docker compose build
+docker buildx bake cu126 --load
 ```
 
-Build without Compose:
+Build and load the CUDA 13.2 lane locally:
 
 ```powershell
-docker build -f docker/Dockerfile --build-arg PYTORCH_IMAGE=pytorch/pytorch:2.12.1-cuda13.0-cudnn9-devel -t gaussian-splatting:pytorch-2.12.1-cuda13.0 .
+docker buildx bake cu132 --load
+```
+
+Build all lanes without loading them into the local Docker image store:
+
+```powershell
+docker buildx bake all
+```
+
+Build all lanes and load them into the local Docker image store:
+
+```powershell
+docker buildx bake all --load
 ```
 
 Tune parallel extension compilation with `MAX_JOBS`:
 
 ```powershell
-$env:MAX_JOBS = '4'
-docker compose build
+docker buildx bake cu130 --load --set cu130.args.MAX_JOBS=4
 ```
+
+Bake exports inline cache metadata by default. This keeps local `--load`
+workflows stable on Docker Desktop while preserving reusable BuildKit metadata
+in the built image. The Dockerfile also uses BuildKit cache mounts for pip and
+is layered so CUDA extension submodule sources and `docker/patches/` are copied
+before the ordinary Python runtime files. This keeps extension wheel builds
+cacheable when only training scripts, helpers, or documentation change.
+
+`.buildx-cache/` is ignored so local-cache experiments can be done with
+`--set` overrides without polluting the repository, but local cache directories
+are not the default because exporting into the same local cache path can trigger
+Docker Desktop ref-lock errors.
 
 ## Runtime Checks
 
@@ -277,7 +306,7 @@ Useful host-side environment variables:
 | `PYTORCH_IMAGE` | `pytorch/pytorch:2.12.1-cuda13.0-cudnn9-devel` | PyTorch base image lane |
 | `TORCH_CUDA_ARCH_LIST` | `8.6;8.9;12.0` | CUDA architectures compiled into extension binaries |
 | `MAX_JOBS` | `8` | Parallel jobs for extension builds |
-| `GS_IMAGE` | `gaussian-splatting:pytorch-2.12.1-cuda13.0` | Local image tag |
+| `GS_IMAGE` | `gaussian-splatting:pytorch-2.12.1-cu130` | Local image tag |
 | `GS_DATASETS_HOST` | `./data` | Host dataset mount |
 | `GS_RUNS_HOST` | `./runs` | Host training output mount |
 | `GS_ARTIFACTS_HOST` | `./artifacts` | Host artifact mount |
@@ -302,9 +331,9 @@ The readiness states are:
 
 | Lane | Current State | Verification Required |
 | --- | --- | --- |
-| PyTorch 2.12.1 + CUDA 13.0 + Python 3.12 | runtime-verified | Re-run on target hardware and benchmark datasets before publishing results |
-| PyTorch 2.12.1 + CUDA 12.6 + Python 3.12 | documented | Build image, run runtime info, run smoke test |
-| PyTorch 2.12.1 + CUDA 13.2 + Python 3.12 | documented | Build image, run runtime info, run smoke test |
+| `cu130`: PyTorch 2.12.1 + CUDA 13.0 + Python 3.12 | runtime-verified | Re-run on target hardware and benchmark datasets before publishing results |
+| `cu126`: PyTorch 2.12.1 + CUDA 12.6 + Python 3.12 | documented | Build image, run runtime info, run smoke test |
+| `cu132`: PyTorch 2.12.1 + CUDA 13.2 + Python 3.12 | documented | Build image, run runtime info, run smoke test |
 
 ## Known Risks And Readiness Notes
 
@@ -323,7 +352,7 @@ The readiness states are:
 The default image lane was verified with:
 
 ```powershell
-docker compose build
+docker buildx bake cu130 --load
 docker compose run --rm gaussian-splatting pytorch-cuda-runtime-info
 docker compose run --rm gaussian-splatting pytorch-cuda-smoke-test
 ```

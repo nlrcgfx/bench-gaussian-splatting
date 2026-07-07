@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 # SPDX-License-Identifier: MIT
 #
 # Reproducible PyTorch + CUDA image for 3D Gaussian Splatting training,
@@ -40,7 +41,8 @@ RUN apt-get update \
         libusb-1.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-RUN python -m pip install --no-cache-dir --upgrade pip "setuptools<82" wheel
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m pip install --upgrade pip "setuptools<82" wheel
 
 COPY requirements/constraints.txt \
      requirements/project.txt \
@@ -55,23 +57,35 @@ RUN mkdir -p /opt/pip \
 
 ENV PIP_CONSTRAINT=/opt/pip/constraints.txt
 
-RUN python -m pip install --no-cache-dir \
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m pip install \
         -r /tmp/requirements/project.txt \
         -r /tmp/requirements/docker-test.txt
 
 FROM deps AS project
 
-COPY . /opt/gaussian-splatting
-
 WORKDIR /opt/gaussian-splatting
+
+COPY docker/patches/diff-gaussian-rasterization-cstdint.patch docker/patches/
+COPY submodules/diff-gaussian-rasterization submodules/diff-gaussian-rasterization
+COPY submodules/simple-knn submodules/simple-knn
+COPY submodules/fused-ssim submodules/fused-ssim
 
 RUN git apply --ignore-space-change \
         --directory=submodules/diff-gaussian-rasterization \
         docker/patches/diff-gaussian-rasterization-cstdint.patch
 
-RUN python -m pip install --no-cache-dir --no-build-isolation ./submodules/diff-gaussian-rasterization \
-    && python -m pip install --no-cache-dir --no-build-isolation ./submodules/simple-knn \
-    && python -m pip install --no-cache-dir --no-build-isolation ./submodules/fused-ssim
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m pip install --no-build-isolation ./submodules/diff-gaussian-rasterization \
+    && python -m pip install --no-build-isolation ./submodules/simple-knn \
+    && python -m pip install --no-build-isolation ./submodules/fused-ssim
+
+COPY arguments arguments
+COPY gaussian_renderer gaussian_renderer
+COPY lpipsPyTorch lpipsPyTorch
+COPY scene scene
+COPY utils utils
+COPY train.py render.py metrics.py full_eval.py convert.py ./
 
 COPY docker/entrypoint.sh /usr/local/bin/pytorch-cuda-entrypoint
 COPY docker/runtime_info.py /usr/local/bin/pytorch-cuda-runtime-info
