@@ -1,3 +1,5 @@
+# Build matrix for image creation. Compose is intentionally kept for runtime
+# commands because it owns GPU flags, mounts, ports, and shared memory.
 variable "PYTORCH_VERSION" {
   default = "2.12.1"
 }
@@ -18,6 +20,8 @@ group "default" {
   targets = ["cu130"]
 }
 
+# Only lanes that have been built and smoke-tested on this workspace belong in
+# this group. cu126/cu132 stay in "all" until they pass the same checks.
 group "verified" {
   targets = ["cu130"]
 }
@@ -26,6 +30,8 @@ group "all" {
   targets = ["cu126", "cu130", "cu132"]
 }
 
+# All targets use inline cache. Docker Desktop repeatedly produced local-cache
+# ref-lock errors when exporting back into the same type=local cache directory.
 target "cu126" {
   context    = "."
   dockerfile = "docker/Dockerfile"

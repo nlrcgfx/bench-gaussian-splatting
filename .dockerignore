@@ -9,6 +9,7 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+# Buildx local-cache experiments can be large and are not image inputs.
 .buildx-cache/
 build-metadata/
 .venv/
@@ -19,6 +20,7 @@ dist/
 
 docs/
 assets/
+# SIBR viewers are separate native viewer builds; this image is training-only.
 SIBR_viewers/
 README.md
 results.md
@@ -30,6 +32,7 @@ runs/
 output/
 eval/
 artifacts/
+# Runtime mounts and benchmark outputs must stay outside the build context.
 cache/
 tensorboard_3d/
 screenshots/

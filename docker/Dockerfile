@@ -4,6 +4,7 @@
 # Reproducible PyTorch + CUDA image for 3D Gaussian Splatting training,
 # rendering, and metrics. The base image owns Python, torch, torchvision,
 # CUDA runtime wheels, and CUDA development tooling.
+# Build CUDA lanes through docker-bake.hcl; keep Compose for runtime.
 
 ARG PYTORCH_IMAGE=pytorch/pytorch:2.12.1-cuda13.0-cudnn9-devel
 
@@ -20,6 +21,8 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG TORCH_CUDA_ARCH_LIST="8.6;8.9;12.0"
 ARG MAX_JOBS=8
 
+# PyTorch's C++ extension builder reads both variables while compiling the
+# rasterizer, simple-knn, and fused-ssim wheels.
 ENV TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST}" \
     MAX_JOBS="${MAX_JOBS}"
 
@@ -49,6 +52,8 @@ COPY requirements/constraints.txt \
      requirements/docker-test.txt \
      /tmp/requirements/
 
+# Freeze the torch stack from the base image into the constraints file so pip
+# cannot replace PyTorch/CUDA wheels while resolving project dependencies.
 RUN mkdir -p /opt/pip \
     && { \
         python -m pip freeze | grep -E '^(torch|torchvision|torchaudio|triton|pytorch-triton)=='; \
@@ -66,20 +71,29 @@ FROM deps AS project
 
 WORKDIR /opt/gaussian-splatting
 
+# Copy extension sources before the rest of the project. This keeps expensive
+# CUDA wheel builds cached when only training scripts or helper files change.
 COPY docker/patches/diff-gaussian-rasterization-cstdint.patch docker/patches/
 COPY submodules/diff-gaussian-rasterization submodules/diff-gaussian-rasterization
 COPY submodules/simple-knn submodules/simple-knn
 COPY submodules/fused-ssim submodules/fused-ssim
 
+# The checked-in patch fixes missing fixed-width integer includes for newer
+# CUDA/PyTorch compilers. --ignore-space-change tolerates the CRLF submodule
+# checkout on Windows while still failing if the patch no longer matches.
 RUN git apply --ignore-space-change \
         --directory=submodules/diff-gaussian-rasterization \
         docker/patches/diff-gaussian-rasterization-cstdint.patch
 
+# Install non-editable extension wheels during image build. Runtime containers
+# should not compile CUDA code on first use.
 RUN --mount=type=cache,target=/root/.cache/pip \
     python -m pip install --no-build-isolation ./submodules/diff-gaussian-rasterization \
     && python -m pip install --no-build-isolation ./submodules/simple-knn \
     && python -m pip install --no-build-isolation ./submodules/fused-ssim
 
+# Copy the Python runtime after extension installation so source-only edits do
+# not invalidate the CUDA extension layer.
 COPY arguments arguments
 COPY gaussian_renderer gaussian_renderer
 COPY lpipsPyTorch lpipsPyTorch
@@ -97,6 +111,7 @@ RUN chmod +x \
         /usr/local/bin/pytorch-cuda-smoke-test \
     && mkdir -p /workspace/project /workspace/datasets /workspace/runs /workspace/artifacts /workspace/cache
 
+# Stable container paths make Compose mounts and benchmark automation explicit.
 ENV PYTHONPATH=/opt/gaussian-splatting \
     GS_DATASETS=/workspace/datasets \
     GS_RUNS=/workspace/runs \

@@ -9,6 +9,7 @@ venv/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+# Buildx cache exports are machine-local; do not commit them.
 .buildx-cache/
 build-metadata/
 build/
@@ -23,6 +24,7 @@ runs/
 output/
 eval/
 artifacts/
+# Compose runtime mounts and benchmark artifacts are intentionally local.
 cache/
 tensorboard_3d/
 screenshots/
