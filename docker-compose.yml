@@ -1,0 +1,29 @@
+services:
+  gaussian-splatting:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PYTORCH_IMAGE: ${PYTORCH_IMAGE:-pytorch/pytorch:2.12.1-cuda13.0-cudnn9-devel}
+        TORCH_CUDA_ARCH_LIST: ${TORCH_CUDA_ARCH_LIST:-8.6;8.9;12.0}
+        MAX_JOBS: ${MAX_JOBS:-8}
+    image: ${GS_IMAGE:-gaussian-splatting:pytorch-2.12.1-cuda13.0}
+    gpus: all
+    shm_size: ${GS_SHM_SIZE:-16gb}
+    working_dir: /workspace/project
+    environment:
+      GS_DATASETS: /workspace/datasets
+      GS_RUNS: /workspace/runs
+      GS_ARTIFACTS: /workspace/artifacts
+      XDG_CACHE_HOME: /workspace/cache
+      TORCH_HOME: /workspace/cache/torch
+      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
+      NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+    volumes:
+      - ${GS_DATASETS_HOST:-./data}:/workspace/datasets
+      - ${GS_RUNS_HOST:-./runs}:/workspace/runs
+      - ${GS_ARTIFACTS_HOST:-./artifacts}:/workspace/artifacts
+      - ${GS_CACHE_HOST:-./cache}:/workspace/cache
+    ports:
+      - "${GS_VIEWER_PORT:-6009}:6009"
+    command: bash
