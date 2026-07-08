@@ -1,5 +1,5 @@
 # Build matrix for image creation. Compose is intentionally kept for runtime
-# commands because it owns GPU flags, mounts, ports, and shared memory.
+# commands because it owns GPU flags, mounts, and shared memory.
 variable "PYTORCH_VERSION" {
   default = "2.12.1"
 }
