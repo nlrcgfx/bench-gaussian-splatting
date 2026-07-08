@@ -93,13 +93,13 @@ in the upstream README.
 ## Docker Image Lanes
 
 Docker Buildx Bake defines the reproducible build matrix in `docker-bake.hcl`.
-The default and currently verified lane is:
+The default lane is:
 
 ```text
 cu130 -> pytorch/pytorch:2.12.1-cuda13.0-cudnn9-devel
 ```
 
-Additional lanes are:
+Additional runtime-verified lanes are:
 
 ```text
 cu126 -> pytorch/pytorch:2.12.1-cuda12.6-cudnn9-devel
@@ -110,7 +110,7 @@ Bake tags the lane images as `gaussian-splatting:pytorch-2.12.1-cu126`,
 `gaussian-splatting:pytorch-2.12.1-cu130`, and
 `gaussian-splatting:pytorch-2.12.1-cu132`.
 
-The default CUDA architecture list is:
+The CUDA 13.0 and CUDA 13.2 lanes default to:
 
 ```text
 8.6;8.9;12.0
@@ -119,6 +119,16 @@ The default CUDA architecture list is:
 This covers Ampere, Ada, and Blackwell-oriented builds. Override
 `TORCH_CUDA_ARCH_LIST` if your deployment target needs a different compiled
 architecture set.
+
+The CUDA 12.6 lane defaults to:
+
+```text
+8.6;8.9
+```
+
+CUDA 12.6's `nvcc` does not support `sm_120`, so the `cu126` Bake target uses
+`TORCH_CUDA_ARCH_LIST_CU126` for its lane-specific default. Override that
+variable if you need a different CUDA 12.6 architecture set.
 
 ## Build Commands
 
@@ -304,6 +314,7 @@ Useful host-side environment variables:
 | --- | --- | --- |
 | `PYTORCH_IMAGE` | `pytorch/pytorch:2.12.1-cuda13.0-cudnn9-devel` | PyTorch base image lane |
 | `TORCH_CUDA_ARCH_LIST` | `8.6;8.9;12.0` | CUDA architectures compiled into extension binaries |
+| `TORCH_CUDA_ARCH_LIST_CU126` | `8.6;8.9` | CUDA 12.6 Bake-lane architecture list |
 | `MAX_JOBS` | `8` | Parallel jobs for extension builds |
 | `GS_IMAGE` | `gaussian-splatting:pytorch-2.12.1-cu130` | Local image tag |
 | `GS_DATASETS_HOST` | `./data` | Host dataset mount |
@@ -329,15 +340,16 @@ The readiness states are:
 
 | Lane | Current State | Verification Required |
 | --- | --- | --- |
+| `cu126`: PyTorch 2.12.1 + CUDA 12.6 + Python 3.12 | runtime-verified | Re-run on target hardware and benchmark datasets before publishing results |
 | `cu130`: PyTorch 2.12.1 + CUDA 13.0 + Python 3.12 | runtime-verified | Re-run on target hardware and benchmark datasets before publishing results |
-| `cu126`: PyTorch 2.12.1 + CUDA 12.6 + Python 3.12 | documented | Build image, run runtime info, run smoke test |
-| `cu132`: PyTorch 2.12.1 + CUDA 13.2 + Python 3.12 | documented | Build image, run runtime info, run smoke test |
+| `cu132`: PyTorch 2.12.1 + CUDA 13.2 + Python 3.12 | runtime-verified | Re-run on target hardware and benchmark datasets before publishing results |
 
 ## Known Risks And Readiness Notes
 
-- CUDA 13.0 is build-verified and runtime-verified in this workspace. CUDA 12.6 and CUDA 13.2 tags exist but still need full build and smoke verification.
-- Sparse Adam is optional. The verified CUDA 13.0 image for this checkout reports `SparseGaussianAdam` as unavailable, so `--optimizer_type sparse_adam` and `full_eval.py --fast` are not part of the verified workflow.
-- The checked-in rasterizer `<cstdint>` patch is required for CUDA 13.0 extension compilation with this rasterizer checkout.
+- CUDA 12.6, CUDA 13.0, and CUDA 13.2 are build-verified and runtime-verified in this workspace.
+- CUDA 12.6 uses `TORCH_CUDA_ARCH_LIST_CU126=8.6;8.9` because CUDA 12.6's `nvcc` rejects `sm_120`.
+- Sparse Adam is optional. The verified images for this checkout report `SparseGaussianAdam` as unavailable, so `--optimizer_type sparse_adam` and `full_eval.py --fast` are not part of the verified workflow.
+- The checked-in rasterizer `<cstdint>` patch is required for CUDA 13 extension compilation with this rasterizer checkout.
 - `full_eval.py` uses string-based `os.system` calls and is less robust than direct command invocation.
 - `full_eval.py` can write `timing.txt` from uninitialized timing variables in some skip-only modes.
 - Full GPU determinism is not guaranteed by the existing optimizer.
@@ -347,25 +359,39 @@ The readiness states are:
 
 ## Verification Notes
 
-The default image lane was verified with:
+The image lanes were verified on this workspace with:
 
 ```powershell
+docker buildx bake cu126 --load
 docker buildx bake cu130 --load
-docker compose run --rm gaussian-splatting pytorch-cuda-runtime-info
-docker compose run --rm gaussian-splatting pytorch-cuda-smoke-test
+docker buildx bake cu132 --load
 ```
 
-Observed runtime:
+Then each loaded image was checked through Compose with `GS_IMAGE` set to the
+lane tag and `--pull never`:
+
+```powershell
+$env:GS_IMAGE = 'gaussian-splatting:pytorch-2.12.1-cu126'
+docker compose run --rm --pull never gaussian-splatting pytorch-cuda-runtime-info
+docker compose run --rm --pull never gaussian-splatting pytorch-cuda-smoke-test
+
+$env:GS_IMAGE = 'gaussian-splatting:pytorch-2.12.1-cu130'
+docker compose run --rm --pull never gaussian-splatting pytorch-cuda-runtime-info
+docker compose run --rm --pull never gaussian-splatting pytorch-cuda-smoke-test
+
+$env:GS_IMAGE = 'gaussian-splatting:pytorch-2.12.1-cu132'
+docker compose run --rm --pull never gaussian-splatting pytorch-cuda-runtime-info
+docker compose run --rm --pull never gaussian-splatting pytorch-cuda-smoke-test
+```
+
+Observed runtime summary:
 
 ```text
-python: 3.12.3
-torch: 2.12.1+cu130
-torch_cuda: 13.0
-cuda_available: True
-cuda_device_0: NVIDIA GeForce RTX 4070 SUPER, capability=8.9
-import_diff_gaussian_rasterization.GaussianRasterizer: ok (required)
-import_diff_gaussian_rasterization.SparseGaussianAdam: fail (optional)
-import_simple_knn._C.distCUDA2: ok (required)
-import_fused_ssim.fused_ssim: ok (required)
-smoke test passed
+cu126: python 3.12.3, torch 2.12.1+cu126, torch_cuda 12.6, cudnn 91002, arch 8.6;8.9
+cu130: python 3.12.3, torch 2.12.1+cu130, torch_cuda 13.0, cudnn 92000, arch 8.6;8.9;12.0
+cu132: python 3.12.3, torch 2.12.1+cu132, torch_cuda 13.2, cudnn 92000, arch 8.6;8.9;12.0
+all lanes: cuda_available True, NVIDIA GeForce RTX 4070 SUPER capability 8.9
+all lanes: required imports ok for GaussianRasterizer, simple_knn.distCUDA2, fused_ssim
+all lanes: SparseGaussianAdam unavailable as an optional import
+all lanes: smoke test passed
 ```

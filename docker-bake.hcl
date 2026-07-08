@@ -8,6 +8,10 @@ variable "TORCH_CUDA_ARCH_LIST" {
   default = "8.6;8.9;12.0"
 }
 
+variable "TORCH_CUDA_ARCH_LIST_CU126" {
+  default = "8.6;8.9"
+}
+
 variable "MAX_JOBS" {
   default = "8"
 }
@@ -17,12 +21,6 @@ variable "GS_IMAGE_PREFIX" {
 }
 
 group "default" {
-  targets = ["cu130"]
-}
-
-# Only lanes that have been built and smoke-tested on this workspace belong in
-# this group. cu126/cu132 stay in "all" until they pass the same checks.
-group "verified" {
   targets = ["cu130"]
 }
 
@@ -39,7 +37,7 @@ target "cu126" {
   tags       = ["${GS_IMAGE_PREFIX}:pytorch-${PYTORCH_VERSION}-cu126"]
   args = {
     PYTORCH_IMAGE       = "pytorch/pytorch:${PYTORCH_VERSION}-cuda12.6-cudnn9-devel"
-    TORCH_CUDA_ARCH_LIST = "${TORCH_CUDA_ARCH_LIST}"
+    TORCH_CUDA_ARCH_LIST = "${TORCH_CUDA_ARCH_LIST_CU126}"
     MAX_JOBS            = "${MAX_JOBS}"
   }
   cache-to   = ["type=inline"]
