@@ -26,7 +26,7 @@ Upstream project links:
 ## Clone
 
 ```bash
-git clone --recursive https://github.com/ramsafin/3d-gaussian-splatting.git
+git clone --recursive https://github.com/nlrcgfx/bench-gaussian-splatting.git
 cd 3d-gaussian-splatting
 ```
 
