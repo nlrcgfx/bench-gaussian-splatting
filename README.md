@@ -27,7 +27,7 @@ Upstream project links:
 
 ```bash
 git clone --recursive https://github.com/nlrcgfx/bench-gaussian-splatting.git
-cd 3d-gaussian-splatting
+cd bench-gaussian-splatting
 ```
 
 If the repository was cloned without submodules:
