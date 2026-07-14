@@ -1,5 +1,5 @@
 # Auto-detect text files, ensure LF line endings
-* text=auto
+* text=auto eol=lf
 
 # Shell scripts - force LF (critical for Docker/Linux)
 *.sh text eol=lf
