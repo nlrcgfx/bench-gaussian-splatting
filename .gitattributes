@@ -1,0 +1,32 @@
+# Auto-detect text files, ensure LF line endings
+* text=auto
+
+# Shell scripts - force LF (critical for Docker/Linux)
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Python files - force LF
+*.py text eol=lf
+
+# Configuration files - force LF
+*.toml text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+
+# Binary files - treat as binary (prevent corruption)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.zip binary
+*.tar.gz binary
+*.tgz binary
+*.gz binary
+
+# Git files
+.gitattributes text eol=lf
+.gitignore text eol=lf
+.gitmodules text eol=lf
+
+# Markdown and documentation
+*.md text eol=lf
